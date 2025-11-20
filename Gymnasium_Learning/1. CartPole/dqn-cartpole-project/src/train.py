@@ -7,36 +7,34 @@ from replay_buffer import ReplayBuffer
 from model import DQNModel
 
 def train():
-    # --- 检查并配置 GPU ---
+    # Configure GPU - Use CUDA for accelerated training
     gpus = tf.config.list_physical_devices('GPU')
     if gpus:
         try:
             for gpu in gpus:
                 tf.config.experimental.set_memory_growth(gpu, True)
-            print("GPU 可用，训练将在 GPU 上运行。")
+            print("GPU available, training will run on GPU.")
         except RuntimeError as e:
             print(e)
     else:
-        print("未检测到 GPU, 训练将在 CPU 上运行。")
-    # -----------------------------
+        print("No GPU detected, training will run on CPU.")
 
-    # 创建用于训练的非渲染环境
+    # Create a non-rendering environment for training
     env = gym.make("CartPole-v1")
     state_size = env.observation_space.shape[0]
     action_size = env.action_space.n
-
     replay_buffer = ReplayBuffer(2000)
     main_model = DQNModel(state_size=state_size, action_size=action_size)
     target_model = DQNModel(state_size=state_size, action_size=action_size)
     target_model.model.set_weights(main_model.model.get_weights())
-
     agent = DQNAgent(state_size, action_size, main_model, target_model, replay_buffer)
     
     num_episodes = 100
     batch_size = 32
     episode_rewards = []
     
-    print("--- 开始训练 ---")
+    print("TRAINING Started\n")
+
     for episode in range(num_episodes):
         state, _ = env.reset()
         state = np.reshape(state, [1, state_size])
@@ -63,9 +61,9 @@ def train():
             agent.update_target_network()
     
     env.close()
-    print("--- 训练结束 ---")
+    print("TRAINING Finished\n")
 
-    # --- 绘制并保存结果图表 ---
+    # Plot and save the results chart
     plt.figure(figsize=(10, 5))
     plt.plot(range(1, num_episodes + 1), episode_rewards)
     plt.title('Total Reward per Episode')
@@ -74,20 +72,17 @@ def train():
     plt.grid(True)
     chart_filename = 'cartpole_rewards_chart.png'
     plt.savefig(chart_filename)
-    print(f"\n奖励图表已保存为 '{chart_filename}'")
+    print(f"\nReward Plot saved as '{chart_filename}'")
 
-    # --- 新增: 保存模型权重 ---
+    # Save model weights
     model_weights_path = 'cartpole_dqn.weights.h5'
     agent.model.model.save_weights(model_weights_path)
-    print(f"模型权重已保存到 '{model_weights_path}'")
-
-    # --- 新增: 可视化训练好的代理 ---
-    print("\n--- 开始可视化 ---")
+    print(f"Model weights saved to '{model_weights_path}'")
     
-    # 创建一个用于可视化的新环境
+    # Create a new environment for visualization
     vis_env = gym.make("CartPole-v1", render_mode="human")
     
-    # 在测试时，我们不希望有随机行为，所以将 epsilon 设为 0
+    # Set epsilon to 0 during testing to avoid random actions
     agent.epsilon = 0.0
     
     state, _ = vis_env.reset()
@@ -95,17 +90,17 @@ def train():
     done = False
     
     while not done:
-        # 让 agent 根据学到的策略选择动作
+        # Let the agent choose actions based on the learned policy
         action = agent.choose_action(state)
         
-        # 执行动作
+        # Execute the action
         next_state, _, terminated, truncated, _ = vis_env.step(action)
         done = terminated or truncated
         
         state = np.reshape(next_state, [1, state_size])
     
     vis_env.close()
-    print("--- 可视化结束 ---")
+    print("--- Visualization Finished ---")
 
 
 if __name__ == "__main__":
