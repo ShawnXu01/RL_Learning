@@ -41,21 +41,20 @@ dqn-cartpole-project/
 ### 训练过程与产出
 
 -   **过程**: 终端会开始打印每一轮 (episode) 的训练进度和该轮获得的总奖励，例如：
+2.  安装所有必需的 Python 库（使用 PyTorch）：
+    ```bash
+    pip install gymnasium torch torchvision matplotlib
     ```
-    Episode 1/100 - Total Reward: 15.0
-    Episode 2/100 - Total Reward: 23.0
-    ...
-    ```
+    *（注意：如果你的机器有兼容的 NVIDIA GPU 并已配置好 CUDA，PyTorch 将会自动使用 GPU 进行加速。）*
 -   **训练产出**: 训练脚本运行结束后（默认 100 轮），会在 `dqn-cartpole-project/src` 文件夹下生成两个关键文件：
     1.  `cartpole_rewards_chart.png`: 一张折线图，可视化了智能体在整个训练过程中的奖励变化趋势。
     2.  `cartpole_dqn.weights.h5`: 一个 HDF5 文件，包含了训练好的神经网络的模型权重。这是智能体“大脑”的最终形态。
-
 ## 如何可视化训练成果
-
+    2.  `cartpole_dqn.pt`: 一个 PyTorch 模型文件，包含了训练好的神经网络的模型权重。你可以用该文件来加载模型并运行可视化。
 在你成功完成训练并生成 `cartpole_dqn.weights.h5` 文件后，你可以运行可视化脚本来亲眼看看智能体的表现。
 
 1.  确保终端路径仍然在 `dqn-cartpole-project/src` 文件夹内。
-2.  运行以下命令：
+在你成功完成训练并生成 `cartpole_dqn.pt` 文件后，你可以运行可视化脚本来亲眼看看智能体的表现。
 
     ```bash
     python run_visualization.py

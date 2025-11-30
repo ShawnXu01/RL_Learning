@@ -1,4 +1,8 @@
 gymnasium
+torch
+torchvision
+numpy
+matplotlibgymnasium
 tensorflow
 numpy
 matplotlib
