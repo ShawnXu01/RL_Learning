@@ -27,7 +27,7 @@ python train.py
 4) 使用训练好的模型播放并保存视频：
 
 ```
-python play.py --checkpoint checkpoints/dqn_last.pth --output play_output.mp4
+python play.py --checkpoint TrainingHistory/dqn_checkpoint.pth --output play_output.mp4
 ```
 
 文件说明：

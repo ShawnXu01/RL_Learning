@@ -17,7 +17,13 @@ def play(checkpoint: str, output: str, max_frames: int = 5000):
     num_actions = env.action_space.n
 
     model = create_model(device, in_channels=3, num_actions=num_actions)
-    model.load_state_dict(torch.load(checkpoint, map_location=device))
+    # support both raw state_dict and checkpoint dicts that contain 'model_state_dict'
+    ckpt_obj = torch.load(checkpoint, map_location=device)
+    if isinstance(ckpt_obj, dict) and 'model_state_dict' in ckpt_obj:
+        state_dict = ckpt_obj['model_state_dict']
+    else:
+        state_dict = ckpt_obj
+    model.load_state_dict(state_dict)
     model.eval()
 
     frames = []

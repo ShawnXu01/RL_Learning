@@ -18,12 +18,14 @@ def discrete_to_continuous(action_idx: int):
     # 2: steer left
     # 3: gas
     # 4: brake
+    # NOTE: steering with zero gas often causes the car to not move.
+    # Provide a small gas value when steering to improve exploration.
     if action_idx == 0:
         return np.array([0.0, 0.0, 0.0], dtype=np.float32)
     elif action_idx == 1:
-        return np.array([+1.0, 0.0, 0.0], dtype=np.float32)
+        return np.array([+1.0, 0.2, 0.0], dtype=np.float32)
     elif action_idx == 2:
-        return np.array([-1.0, 0.0, 0.0], dtype=np.float32)
+        return np.array([-1.0, 0.2, 0.0], dtype=np.float32)
     elif action_idx == 3:
         return np.array([0.0, 1.0, 0.0], dtype=np.float32)
     elif action_idx == 4:
