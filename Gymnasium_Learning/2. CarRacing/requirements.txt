@@ -1,0 +1,9 @@
+gymnasium
+box2d-py
+pygame
+numpy
+torch
+torchvision
+opencv-python
+imageio
+matplotlib
