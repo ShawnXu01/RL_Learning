@@ -16,19 +16,40 @@ from model import create_model
 from utils import preprocess_observation, discrete_to_continuous
 
 
-def visualize(checkpoint: str, episodes: int = 1, max_steps: int = 2000):
+def visualize(checkpoint: str, episodes: int = 1, max_steps: int = 2000, seed: int = None):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # try human render, fallback to rgb_array + cv2.imshow
+    # If seed provided, fix RNGs so the chosen track and any sampling is reproducible
+    if seed is not None:
+        import random as _random
+        _random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+
+    # Create environment in continuous mode so we can apply continuous
+    # control (steering, gas, brake). For visualization we always map the
+    # model's discrete output to a continuous action that includes baseline gas.
     use_human = False
     try:
-        env = gym.make('CarRacing-v3', continuous=False, render_mode='human')
+        env = gym.make('CarRacing-v3', continuous=True, render_mode='human')
         use_human = True
     except Exception:
-        env = gym.make('CarRacing-v3', continuous=False, render_mode='rgb_array')
+        env = gym.make('CarRacing-v3', continuous=True, render_mode='rgb_array')
 
-    obs, _ = env.reset()
-    num_actions = env.action_space.n
+    if seed is not None:
+        obs, _ = env.reset(seed=seed)
+    else:
+        obs, _ = env.reset()
+
+    # model was trained with a discrete action space (5 actions). The
+    # continuous environment's action_space may not have `.n`, so fall
+    # back to 5 if needed.
+    if hasattr(env.action_space, 'n'):
+        num_actions = env.action_space.n
+    else:
+        num_actions = 5
 
     model = create_model(device, in_channels=3, num_actions=num_actions)
 
@@ -96,7 +117,10 @@ def visualize(checkpoint: str, episodes: int = 1, max_steps: int = 2000):
     model.eval()
 
     for ep in range(episodes):
-        obs, _ = env.reset()
+        if seed is not None:
+            obs, _ = env.reset(seed=seed)
+        else:
+            obs, _ = env.reset()
         done = False
         step = 0
         while not done and step < max_steps:
@@ -106,11 +130,9 @@ def visualize(checkpoint: str, episodes: int = 1, max_steps: int = 2000):
                 q = model(s)
                 action = int(q.argmax(1).item())
 
-            try:
-                next_obs, reward, terminated, truncated, _ = env.step(action)
-            except Exception:
-                cont = discrete_to_continuous(action)
-                next_obs, reward, terminated, truncated, _ = env.step(cont)
+            # map discrete model output to continuous control and always step
+            cont = discrete_to_continuous(action)
+            next_obs, reward, terminated, truncated, _ = env.step(cont)
 
             if use_human:
                 # when render_mode='human' the window is handled by the env
@@ -138,5 +160,6 @@ if __name__ == '__main__':
     parser.add_argument('--checkpoint', type=str, required=False, default='TrainingHistory/dqn_checkpoint.pth')
     parser.add_argument('--episodes', type=int, default=1)
     parser.add_argument('--max_steps', type=int, default=2000)
+    parser.add_argument('--seed', type=int, default=1028, help='Optional seed to fix track generation and RNGs')
     args = parser.parse_args()
-    visualize(args.checkpoint, args.episodes, args.max_steps)
+    visualize(args.checkpoint, args.episodes, args.max_steps, seed=args.seed)

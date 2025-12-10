@@ -9,11 +9,21 @@ from model import create_model
 from utils import preprocess_observation, discrete_to_continuous
 
 
-def play(checkpoint: str, output: str, max_frames: int = 5000):
+def play(checkpoint: str, output: str, max_frames: int = 5000, seed: int = None):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # If seed provided, fix RNGs for reproducible visuals/behavior
+    if seed is not None:
+        import random as _random
+        _random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
     env = gym.make('CarRacing-v3', continuous=False, render_mode='rgb_array')
-
-    obs, _ = env.reset()
+    if seed is not None:
+        obs, _ = env.reset(seed=seed)
+    else:
+        obs, _ = env.reset()
     num_actions = env.action_space.n
 
     model = create_model(device, in_channels=3, num_actions=num_actions)
@@ -27,7 +37,10 @@ def play(checkpoint: str, output: str, max_frames: int = 5000):
     model.eval()
 
     frames = []
-    obs, _ = env.reset()
+    if seed is not None:
+        obs, _ = env.reset(seed=seed)
+    else:
+        obs, _ = env.reset()
     done = False
     frame_count = 0
 
@@ -64,5 +77,6 @@ if __name__ == '__main__':
     parser.add_argument('--checkpoint', type=str, required=True)
     parser.add_argument('--output', type=str, default='play_output.mp4')
     parser.add_argument('--max_frames', type=int, default=5000)
+    parser.add_argument('--seed', type=int, default=1028, help='Optional seed to fix track generation and RNGs')
     args = parser.parse_args()
-    play(args.checkpoint, args.output, args.max_frames)
+    play(args.checkpoint, args.output, args.max_frames, seed=args.seed)

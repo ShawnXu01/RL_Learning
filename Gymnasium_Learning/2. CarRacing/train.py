@@ -17,7 +17,7 @@ import re
 
 from model import create_model
 from replay_buffer import ReplayBuffer
-from utils import preprocess_observation
+from utils import preprocess_observation, discrete_to_continuous
 
 
 def soft_update(target, source, tau):
@@ -37,9 +37,28 @@ def train(args):
             # in case getting device name fails for some reason
             pass
 
+    # If seed provided, set RNGs for reproducibility and make cudnn deterministic
+    if getattr(args, 'seed', None) is not None:
+        seed = args.seed
+        print(f"Setting random seed: {seed}")
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+        # make cuDNN deterministic for reproducibility (may impact perf)
+        try:
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+        except Exception:
+            pass
+
     env = gym.make('CarRacing-v3', continuous=False)
 
-    obs, _ = env.reset()
+    if getattr(args, 'seed', None) is not None:
+        obs, _ = env.reset(seed=args.seed)
+    else:
+        obs, _ = env.reset()
     in_channels = 3
     num_actions = env.action_space.n
 
@@ -120,7 +139,10 @@ def train(args):
     if args.warmup_steps > 0:
         print(f'Warming up for {args.warmup_steps} random steps to fill replay buffer...')
         warmed = 0
-        obs_w, _ = env.reset()
+        if getattr(args, 'seed', None) is not None:
+            obs_w, _ = env.reset(seed=args.seed)
+        else:
+            obs_w, _ = env.reset()
         state_w = preprocess_observation(obs_w)
         while warmed < args.warmup_steps:
             # bias random actions slightly towards gas so car moves during warmup
@@ -128,6 +150,7 @@ def train(args):
             # with 40% prob force gas action to ensure movement
             if random.random() < 0.4:
                 a = 3
+            # always step using continuous mapping so baseline gas is applied
             next_obs_w, reward_w, term_w, trunc_w, _ = env.step(a)
             done_w = term_w or trunc_w
             next_state_w = preprocess_observation(next_obs_w)
@@ -136,7 +159,10 @@ def train(args):
             total_steps += 1
             state_w = next_state_w
             if done_w:
-                obs_w, _ = env.reset()
+                if getattr(args, 'seed', None) is not None:
+                    obs_w, _ = env.reset(seed=args.seed)
+                else:
+                    obs_w, _ = env.reset()
                 state_w = preprocess_observation(obs_w)
         print('Warmup finished; starting training')
 
@@ -153,7 +179,10 @@ def train(args):
         end_episode = new_end
 
     for episode in range(start_episode, end_episode + 1):
-        obs, _ = env.reset()
+        if getattr(args, 'seed', None) is not None:
+            obs, _ = env.reset(seed=args.seed)
+        else:
+            obs, _ = env.reset()
         state = preprocess_observation(obs)
         episode_reward = 0.0
         done = False
@@ -172,6 +201,7 @@ def train(args):
                     q = policy(s)
                     action = int(q.argmax(1).item())
 
+            # always map discrete -> continuous so baseline gas is applied
             next_obs, reward, terminated, truncated, _ = env.step(action)
             done_flag = terminated or truncated
             next_state = preprocess_observation(next_obs)
@@ -267,7 +297,10 @@ def train(args):
             # launch visualization for this checkpoint
             try:
                 print('Launching visualization to show trained policy...')
-                subprocess.run([sys.executable, viz_path, '--checkpoint', ckpt_path])
+                cmd = [sys.executable, viz_path, '--checkpoint', ckpt_path]
+                if getattr(args, 'seed', None) is not None:
+                    cmd += ['--seed', str(args.seed)]
+                subprocess.run(cmd)
             except Exception as e:
                 print('Failed to launch visualization:', e)
 
@@ -306,7 +339,10 @@ def train(args):
     # automatically run visualization script to show trained policy
     try:
         print('Launching visualization to show trained policy...')
-        subprocess.run([sys.executable, viz_path, '--checkpoint', final_ckpt])
+        cmd = [sys.executable, viz_path, '--checkpoint', final_ckpt]
+        if getattr(args, 'seed', None) is not None:
+            cmd += ['--seed', str(args.seed)]
+        subprocess.run(cmd)
     except Exception as e:
         print('Failed to launch visualization:', e)
 
@@ -327,5 +363,6 @@ if __name__ == '__main__':
     parser.add_argument('--save_episode', type=int, default=50)
     parser.add_argument('--chunk_size', type=int, default=100, help='Number of episodes per chunk before saving and visualizing')
     parser.add_argument('--warmup_steps', type=int, default=1000, help='Number of random env steps to run before training to fill replay buffer')
+    parser.add_argument('--seed', type=int, default=1028, help='Optional seed to fix track generation and RNGs')
     args = parser.parse_args()
     train(args)
